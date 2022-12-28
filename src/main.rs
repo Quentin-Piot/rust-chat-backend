@@ -2,21 +2,21 @@ use std::env;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-use crate::entities::prelude::User;
 use axum::{
-    extract::{FromRef, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
-    response::IntoResponse,
+    extract::State,
+    http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, DbErr};
-use serde::{Deserialize, Serialize};
+use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::entities::user;
+use crate::users::dto::CreateUser;
+use crate::users::mutation::UserMutation;
 
 mod entities;
+mod users;
 
 #[derive(Clone)]
 struct AppState {
@@ -53,8 +53,6 @@ async fn main() {
         .route("/users", post(create_user))
         .with_state(state);
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on http://{}", addr);
     axum::Server::bind(&addr)
@@ -64,23 +62,25 @@ async fn main() {
 }
 
 // basic handler that responds with a static string
-async fn root(State(state): State<AppState>) -> &'static str {
+async fn root() -> &'static str {
     "Hello, World!"
 }
 
 async fn create_user(
     State(state): State<AppState>,
+    Json(payload): Json<CreateUser>,
 ) -> Result<PostResponse, (StatusCode, &'static str)> {
-    // insert your application logic here
-    let user = user::ActiveModel {
-        email: ActiveValue::Set("test@test".to_owned()),
-        password: ActiveValue::Set("password".to_owned()),
-        ..Default::default()
-    };
-
-    user.save(&state.database).await.expect("ooops");
-
-    Ok((StatusCode::CREATED))
+    UserMutation::create_user(
+        &state.database,
+        user::Model {
+            email: payload.email,
+            password: payload.password,
+            id: 0,
+        },
+    )
+    .await
+    .expect("issue");
+    Ok(StatusCode::CREATED)
 }
 
-pub type PostResponse = (StatusCode);
+pub type PostResponse = StatusCode;
