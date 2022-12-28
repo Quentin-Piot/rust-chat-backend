@@ -2,17 +2,18 @@ use std::env;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
+use axum::extract::Path;
 use axum::{
     extract::State,
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::entities::user;
-use crate::users::dto::CreateUser;
+use crate::users::dto::{CreateUser, UpdateUser};
 use crate::users::mutation::UserMutation;
 
 mod entities;
@@ -51,6 +52,7 @@ async fn main() {
         // `GET /` goes to `root`
         .route("/", get(root))
         .route("/users", post(create_user))
+        .route("/users/:id", put(update_user))
         .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
@@ -76,6 +78,24 @@ async fn create_user(
             email: payload.email,
             password: payload.password,
             id: 0,
+        },
+    )
+    .await
+    .expect("issue");
+    Ok(StatusCode::CREATED)
+}
+
+async fn update_user(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(payload): Json<UpdateUser>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    UserMutation::update_user(
+        &state.database,
+        user::Model {
+            email: payload.email,
+            password: payload.password,
+            id,
         },
     )
     .await
