@@ -1,12 +1,27 @@
+use std::env;
+use std::net::SocketAddr;
+use std::str::FromStr;
+
+use crate::entities::prelude::User;
 use axum::{
-    routing::{get, post},
-    http::StatusCode,
+    extract::{FromRef, State},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
+    routing::{get, post},
     Json, Router,
 };
+use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, DbErr};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::entities::user;
+
+mod entities;
+
+#[derive(Clone)]
+struct AppState {
+    database: DatabaseConnection,
+}
 
 #[tokio::main]
 async fn main() {
@@ -18,16 +33,29 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    dotenvy::dotenv().ok();
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
+    let host = env::var("HOST").expect("HOST is not set in .env file");
+    let port = env::var("PORT").expect("PORT is not set in .env file");
+    let server_url = format!("{}:{}", host, port);
+
+    let database = Database::connect(db_url)
+        .await
+        .expect("Database connection failed");
+
+    let state = AppState { database };
+
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        // `POST /users` goes to `create_user`
-        .route("/users", post(create_user));
+        .route("/users", post(create_user))
+        .with_state(state);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on http://{}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -36,35 +64,23 @@ async fn main() {
 }
 
 // basic handler that responds with a static string
-async fn root() -> &'static str {
+async fn root(State(state): State<AppState>) -> &'static str {
     "Hello, World!"
 }
 
 async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json<CreateUser>,
-) -> impl IntoResponse {
+    State(state): State<AppState>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
     // insert your application logic here
-    let user = User {
-        id: 1337,
-        username: payload.username,
+    let user = user::ActiveModel {
+        email: ActiveValue::Set("test@test".to_owned()),
+        password: ActiveValue::Set("password".to_owned()),
+        ..Default::default()
     };
 
-    // this will be converted into a JSON response
-    // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
+    user.save(&state.database).await.expect("ooops");
+
+    Ok((StatusCode::CREATED))
 }
 
-// the input to our `create_user` handler
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
-
-// the output to our `create_user` handler
-#[derive(Serialize)]
-struct User {
-    id: u64,
-    username: String,
-}
+pub type PostResponse = (StatusCode);

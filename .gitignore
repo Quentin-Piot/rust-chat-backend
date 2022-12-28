@@ -12,3 +12,13 @@ Cargo.lock
 
 #IDE
 .idea
+
+
+#env
+.env
+
+target
+migration/target/**
+
+
+http
