@@ -2,4 +2,7 @@
 
 pub mod prelude;
 
+pub mod group;
+pub mod group_user;
+pub mod message;
 pub mod user;
