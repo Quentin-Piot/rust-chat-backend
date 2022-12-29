@@ -39,27 +39,14 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Group::isDuo).boolean().not_null())
-                    .col(ColumnDef::new(Group::CreatedBy).string().not_null())
-                    .to_owned(),
-            )
-            .await
-            .expect("Error creating group table");
-
-        manager
-            .create_table(
-                Table::create()
-                    .table(Group::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Group::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                    .col(ColumnDef::new(Group::IsDuo).boolean().not_null())
+                    .col(ColumnDef::new(Group::CreatedBy).integer().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-group-user")
+                            .from(Group::Table, Group::CreatedBy)
+                            .to(User::Table, User::Id),
                     )
-                    .col(ColumnDef::new(Group::isDuo).boolean().not_null())
-                    .col(ColumnDef::new(Group::CreatedBy).string().not_null())
                     .to_owned(),
             )
             .await
@@ -152,7 +139,7 @@ enum User {
 enum Group {
     Table,
     Id,
-    isDuo,
+    IsDuo,
     CreatedBy,
 }
 

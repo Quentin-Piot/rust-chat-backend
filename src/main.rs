@@ -2,21 +2,23 @@ use std::env;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
+use crate::groups::dto::CreateGroup;
+use crate::groups::mutation::GroupMutation;
 use axum::extract::Path;
 use axum::{
     extract::State,
     http::StatusCode,
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::entities::user;
 use crate::users::dto::{CreateUser, UpdateUser};
 use crate::users::mutation::UserMutation;
 
 mod entities;
+mod groups;
 mod users;
 
 #[derive(Clone)]
@@ -53,6 +55,9 @@ async fn main() {
         .route("/", get(root))
         .route("/users", post(create_user))
         .route("/users/:id", put(update_user))
+        .route("/users/:id", delete(delete_user))
+        .route("/groups", post(create_group))
+        .route("/groups/:id", delete(delete_group))
         .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
@@ -63,25 +68,19 @@ async fn main() {
         .unwrap();
 }
 
-// basic handler that responds with a static string
 async fn root() -> &'static str {
     "Hello, World!"
 }
+
+// USER
 
 async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUser>,
 ) -> Result<PostResponse, (StatusCode, &'static str)> {
-    UserMutation::create_user(
-        &state.database,
-        user::Model {
-            email: payload.email,
-            password: payload.password,
-            id: 0,
-        },
-    )
-    .await
-    .expect("issue");
+    UserMutation::create_user(&state.database, payload)
+        .await
+        .expect("Can't create user");
     Ok(StatusCode::CREATED)
 }
 
@@ -90,17 +89,41 @@ async fn update_user(
     Path(id): Path<i32>,
     Json(payload): Json<UpdateUser>,
 ) -> Result<PostResponse, (StatusCode, &'static str)> {
-    UserMutation::update_user(
-        &state.database,
-        user::Model {
-            email: payload.email,
-            password: payload.password,
-            id,
-        },
-    )
-    .await
-    .expect("issue");
+    UserMutation::update_user(&state.database, id, payload)
+        .await
+        .expect("Can't update user");
+    Ok(StatusCode::OK)
+}
+
+async fn delete_user(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    UserMutation::delete_user(&state.database, id)
+        .await
+        .expect("Can't delete user");
+    Ok(StatusCode::OK)
+}
+
+// GROUP
+
+async fn create_group(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateGroup>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    GroupMutation::create_group(&state.database, payload)
+        .await
+        .expect("Can't create group");
     Ok(StatusCode::CREATED)
 }
 
+async fn delete_group(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    GroupMutation::delete_group(&state.database, id)
+        .await
+        .expect("Can't delete group");
+    Ok(StatusCode::OK)
+}
 pub type PostResponse = StatusCode;
