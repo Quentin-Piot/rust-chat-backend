@@ -2,8 +2,6 @@ use std::env;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-use crate::groups::dto::CreateGroup;
-use crate::groups::mutation::GroupMutation;
 use axum::extract::Path;
 use axum::{
     extract::State,
@@ -14,11 +12,16 @@ use axum::{
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use crate::groups::dto::{CreateGroup, JoinGroup};
+use crate::groups::mutation::GroupMutation;
+use crate::messages::dto::CreateMessage;
+use crate::messages::mutation::MessageMutation;
 use crate::users::dto::{CreateUser, UpdateUser};
 use crate::users::mutation::UserMutation;
 
 mod entities;
 mod groups;
+mod messages;
 mod users;
 
 #[derive(Clone)]
@@ -57,7 +60,10 @@ async fn main() {
         .route("/users/:id", put(update_user))
         .route("/users/:id", delete(delete_user))
         .route("/groups", post(create_group))
+        .route("/groups/:id/join", post(join_group))
         .route("/groups/:id", delete(delete_group))
+        .route("/messages", post(create_message))
+        .route("/messages/:id", delete(delete_message))
         .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
@@ -117,6 +123,18 @@ async fn create_group(
     Ok(StatusCode::CREATED)
 }
 
+async fn join_group(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(payload): Json<JoinGroup>,
+) -> Result<PostResponse, (StatusCode, String)> {
+    let result = GroupMutation::join_group(&state.database, id, payload.user).await;
+    return match result {
+        Ok(_) => return Ok(StatusCode::CREATED),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    };
+}
+
 async fn delete_group(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -126,4 +144,27 @@ async fn delete_group(
         .expect("Can't delete group");
     Ok(StatusCode::OK)
 }
+
+// Message
+
+async fn create_message(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateMessage>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    MessageMutation::create_message(&state.database, payload)
+        .await
+        .expect("Can't create message");
+    Ok(StatusCode::CREATED)
+}
+
+async fn delete_message(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<PostResponse, (StatusCode, &'static str)> {
+    MessageMutation::delete_message(&state.database, id)
+        .await
+        .expect("Can't delete message");
+    Ok(StatusCode::OK)
+}
+
 pub type PostResponse = StatusCode;
