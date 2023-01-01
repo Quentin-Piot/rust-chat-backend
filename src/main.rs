@@ -12,8 +12,9 @@ use axum::{
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::groups::dto::{CreateGroup, JoinGroup};
+use crate::groups::dto::{CreateGroup, JoinGroup, PopulatedGroup};
 use crate::groups::mutation::GroupMutation;
+use crate::groups::query::GroupQuery;
 use crate::messages::dto::CreateMessage;
 use crate::messages::mutation::MessageMutation;
 use crate::users::dto::{CreateUser, UpdateUser};
@@ -57,6 +58,7 @@ async fn main() {
         // `GET /` goes to `root`
         .route("/", get(root))
         .route("/users", post(create_user))
+        .route("/users/:id/groups", get(get_user_groups))
         .route("/users/:id", put(update_user))
         .route("/users/:id", delete(delete_user))
         .route("/groups", post(create_group))
@@ -88,6 +90,17 @@ async fn create_user(
         .await
         .expect("Can't create user");
     Ok(StatusCode::CREATED)
+}
+
+async fn get_user_groups(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Json<Vec<PopulatedGroup>> {
+    let populated_groups = GroupQuery::get_user_groups(&state.database, id)
+        .await
+        .expect("Can't get groups");
+
+    Json(populated_groups)
 }
 
 async fn update_user(
