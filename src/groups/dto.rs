@@ -1,10 +1,12 @@
+use serde::{Deserialize, Serialize};
+
 use crate::messages::types::SerializableMessage;
 use crate::users::types::SerializableUser;
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct CreateGroup {
     pub is_duo: bool,
+    pub name: String,
     pub created_by: i32,
 }
 
@@ -16,6 +18,7 @@ pub struct JoinGroup {
 #[derive(Serialize)]
 pub struct PopulatedGroup {
     pub id: i32,
+    pub name: String,
     pub is_duo: bool,
     pub created_by: SerializableUser,
     pub users: Vec<SerializableUser>,

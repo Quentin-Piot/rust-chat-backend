@@ -1,4 +1,5 @@
 use sea_orm::{ActiveModelTrait, ActiveValue, DbConn, DbErr, DeleteResult};
+use serde::de::Unexpected::Option;
 
 use crate::entities::group;
 use crate::entities::group_user::ActiveModel;
@@ -14,11 +15,21 @@ impl GroupMutation {
     ) -> Result<group::ActiveModel, DbErr> {
         let group = group::ActiveModel {
             is_duo: ActiveValue::Set(form_data.is_duo),
+            name: ActiveValue::Set(form_data.name),
             created_by: ActiveValue::Set(form_data.created_by),
             ..Default::default()
         };
 
-        group.save(db).await
+        let group = group.save(db).await.unwrap();
+        let id = group.clone().id.unwrap();
+        let group_user = ActiveModel {
+            group: ActiveValue::Set(id),
+            user: ActiveValue::Set(form_data.created_by),
+            ..Default::default()
+        };
+        group_user.save(db).await.expect("Can't create relation");
+
+        return Ok(group);
     }
 
     pub async fn join_group(db: &DbConn, id: i32, user_id: i32) -> Result<ActiveModel, DbErr> {

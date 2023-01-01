@@ -53,6 +53,7 @@ impl GroupQuery {
             let messages = group.find_related(Message).all(db).await;
             let mut serializable_group = PopulatedGroup {
                 id: group.id,
+                name: group.name,
                 is_duo: group.is_duo,
                 created_by: SerializableUser {
                     id: group_user.id,

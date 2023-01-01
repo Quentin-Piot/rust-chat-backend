@@ -1,5 +1,6 @@
-use crate::ColumnSpec::Default;
 use sea_orm_migration::prelude::*;
+
+use crate::ColumnSpec::Default;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -39,6 +40,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
+                    .col(ColumnDef::new(Group::Name).string().not_null())
                     .col(ColumnDef::new(Group::IsDuo).boolean().not_null())
                     .col(ColumnDef::new(Group::CreatedBy).integer().not_null())
                     .foreign_key(
@@ -139,6 +141,7 @@ enum User {
 enum Group {
     Table,
     Id,
+    Name,
     IsDuo,
     CreatedBy,
 }

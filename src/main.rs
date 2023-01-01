@@ -10,6 +10,7 @@ use axum::{
     Json, Router,
 };
 use sea_orm::{Database, DatabaseConnection};
+use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::groups::dto::{CreateGroup, JoinGroup, PopulatedGroup};
@@ -52,6 +53,7 @@ async fn main() {
         .expect("Database connection failed");
 
     let state = AppState { database };
+    let cors = CorsLayer::new().allow_origin(Any);
 
     // build our application with a route
     let app = Router::new()
@@ -66,7 +68,8 @@ async fn main() {
         .route("/groups/:id", delete(delete_group))
         .route("/messages", post(create_message))
         .route("/messages/:id", delete(delete_message))
-        .with_state(state);
+        .with_state(state)
+        .layer(cors);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on http://{}", addr);
